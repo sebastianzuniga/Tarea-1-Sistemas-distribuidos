@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:6.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: diego
+      MONGO_INITDB_ROOT_PASSWORD: diego
+    volumes:
+      - ./mongo_data:/data/db   # Los archivos de DB viven en ./mongo_data
+
+  redis:
+    image: redis:7.0
+    #container_name: redis_container
+    #restart: unless-stopped
+    #command: ["redis-server", "--maxmemory", "20mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["redis-server", "--maxmemory", "20mb", "--maxmemory-policy", "volatile-random"]
+    ports:
+      - "6379:6379"
+      
+  scraper:
+    build: .
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_URI: "mongodb+srv://diego:diego@waze.5jx8mup.mongodb.net/?retryWrites=true&w=majority&appName=Waze"
+    command: ["python", "scraper.py"]
+    volumes:
+      - .:/app
+    working_dir: /app
+
+  trafficgen:
+    build: .
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      MONGO_URI: "mongodb+srv://diego:diego@waze.5jx8mup.mongodb.net/?retryWrites=true&w=majority&appName=Waze"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TRAFFIC_EVENTS: 5000
+      TRAFFIC_SAMPLE_SIZE: 20
+      TRAFFIC_BASE_TTL: 60
+      TRAFFIC_RATE: 2.0
+      TRAFFIC_QUERIES: 100
+    command: ["python", "traffic_generator.py"]
+
+volumes:
+  mongo_data:
+
